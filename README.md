@@ -1,69 +1,88 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
-<p><a href="https://www.buymeacoffee.com/6rF5cQl" rel="nofollow" target="_blank"><img src="https://camo.githubusercontent.com/c070316e7fb193354999ef4c93df4bd8e21522fa/68747470733a2f2f696d672e736869656c64732e696f2f7374617469632f76312e7376673f6c6162656c3d4275792532306d6525323061253230636f66666565266d6573736167653d25463025394625413525413826636f6c6f723d626c61636b266c6f676f3d6275792532306d6525323061253230636f66666565266c6f676f436f6c6f723d7768697465266c6162656c436f6c6f723d366634653337" alt="Buy me a coffee" data-canonical-src="https://img.shields.io/static/v1.svg?label=Buy%20me%20a%20coffee&amp;message=%F0%9F%A5%A8&amp;color=black&amp;logo=buy%20me%20a%20coffee&amp;logoColor=white&amp;labelColor=b0c4de" style="max-width:100%;"></a></p>
+# BKK Stop Information (enriched fork)
 
-# BKK Stop Information custom component for Home Assistant
-## Providing also a custom state card for legacyUI.
+Home Assistant custom component for [Budapest GO / BKK](https://go.bkk.hu/) stop departures.
 
-This custom component and custom card shows Budapest Public Transportation (BKK)
-line information departing in the near future from a configurable stop.<p>
+This is a fork of [amaximus/bkk_stop](https://github.com/amaximus/bkk_stop) with rail enrichment and leaner attributes for map-friendly Lovelace cards. Pair with **[bator/bkk-stop-card](https://github.com/bator/bkk-stop-card)**.
 
-#### Installation
-The easiest way to install it is through [HACS (Home Assistant Community Store)](https://github.com/hacs/integration),
-search for <i>BKK Stop Information</i> in the Integrations.<br />
+## What’s new in this fork
 
-If you are not using HACS, download the files from custom_components/bkk_stop into your
-$homeassistant_config_dir/custom_components/bkk_stop.<br />
+- **`tripId`** on each departure (card can fetch the trip polyline on demand)
+- **No bulky `shape` prefetch** — keeps sensor state small (~KB instead of tens of KB)
+- **MÁV ELVIRA enrichment** (unofficial passenger-info API) for known rail stations:
+  - live **platform / vágány** (`platform`, optionally baked into `headsign` as `· vág.N`)
+  - delay reason, train number / name
+  - booking / dining / bike flags and `services[]`
+  - station-level `stationHavaria`
+- Extra vehicle fields when available: delay, model, occupancy, GPS `lat`/`lon`, alerts
+- API health tracking (`api_ok`, consecutive failures / threshold)
 
-Once downloaded and configured as per below information you'll need to restart HomeAssistant to have the custom component
-and the sensors of bkk_stop platform taken into consideration.
+> ELVIRA is unofficial and may change without notice. It is enabled by default for mapped rail stops and can be disabled with `elvira: false`.
 
-#### Configuration:
-Define sensors with the following configuration parameters:<br />
+## Installation
 
----
-| Name | Optional | `Default` | Description |
-| :---- | :---- | :------- | :----------- |
-| name | **N** | - | sensor of bkk_stop type to display |
-| stopId | **N** | - | StopId as per [go.bkk.hu](https://go.bkk.hu/) |
-| apiKey | **N** | - | API Key to BKK data as per [opendata.bkk.hu](https://opendata.bkk.hu/) |
-| maxItems | **Y** | `0` | Number of items to consider. 0 disables this feature |
-| minsAfter | **Y** | `20` | Number of minutes ahead to show vehicles departing from station |
-| wheelchair | **Y** | `false` | Display vehicle's wheelchair accessibility |
-| bikes | **Y** | `false` | Display whether bikes are allowed on vehicle |
-| colors | **Y** | `false` | Display BKK's default color for the line and the text |
-| ignoreNow | **Y** | `true` | Ignore vehicles already in the station |
-| entity_id | **Y** | `` | Used instead of name for automatic generation of entity_id |
-| inPredicted | **Y** | `false` | Calculate time in as per estimated arrival time, when available |
-| routes | **Y** | `` | List of routes to consider. Those not listed will be discarded |
-| headsigns | **Y** | `` | List of headsigns to consider. Those not listed will be discarded. Useful for trans stations |
-| minsBefore | **Y** | `0` | Skip vehicles departing from station in `minsBefore` minutes, e.g. while walking to the station. Use non-positive value! |
----
+1. Copy `custom_components/bkk_stop/` into your Home Assistant config
+2. Add sensors under `sensor:` (or a package / `!include`)
+3. Restart Home Assistant
 
-The integration provides an action ```bkk_stop:refresh``` for instant refresh requiring an entity_id.
+You need your own BKK API key from [opendata.bkk.hu](https://opendata.bkk.hu/).
 
-On begining of June the test API key has been revoked, therefore to use this integration you'll have to create an account
-at [opendata.bkk.hu](https://opendata.bkk.hu/), generate an API key for yourself and set that in the integration configuration.
+## Configuration
 
-#### Example
+| Name | Optional | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | **N** | — | Sensor name |
+| `stopId` | **N** | — | Stop id from [go.bkk.hu](https://go.bkk.hu/) |
+| `apiKey` | **N** | — | BKK OpenData API key |
+| `maxItems` | Y | `0` | Max departures (`0` = unlimited) |
+| `minsAfter` | Y | `20` | Minutes ahead to include |
+| `minsBefore` | Y | `0` | Skip soon departures (≤ 0) |
+| `wheelchair` | Y | `false` | Wheelchair attribute |
+| `bikes` | Y | `false` | Bike attribute |
+| `colors` | Y | `false` | Route colours |
+| `ignoreNow` | Y | `true` | Ignore vehicles already at the stop |
+| `inPredicted` | Y | `false` | Use predicted time for “in minutes” |
+| `vehicle` | Y | `true` | Include live vehicle details when present |
+| `routes` | Y | `[]` | Allow-list of route labels |
+| `headsigns` | Y | `[]` | Allow-list of headsigns |
+| `elvira` | Y | `true` | Enable ELVIRA enrichment for mapped rail stops |
+| `failureThreshold` | Y | (built-in) | Consecutive API failures before marking unhealthy |
+
+### Example — suburban rail from Kelenföld
+
+```yaml
+- platform: bkk_stop
+  name: vonatok_pestrol
+  stopId: BKK_005501024
+  minsAfter: 120
+  wheelchair: true
+  bikes: true
+  colors: true
+  inPredicted: true
+  vehicle: true
+  elvira: true
+  apiKey: !secret bkk_apikey
+  headsigns:
+    - Székesfehérvár
+    - Balatonfüred
+  routes:
+    - G43
+    - Z30
+    - S30
+    - IR
+    - IC
 ```
-platform: bkk_stop
-name: 'bkk7u'
-stopId: 'BKK_F00940'
-minsAfter: 25
-wheelchair: true
-apiKey: !secret bkk_apikey
-routes:
-  - 287
-  - 114
-  - 213
-```
 
-#### Lovelace UI
-There is a Lovelace custom card related to this component at [https://github.com/amaximus/bkk-stop-card](https://github.com/amaximus/bkk-stop-card).
+## Lovelace card
 
-#### Legacy UI
-Custom state card is provided for presenting data on legacy UI. Pls see the legacyUI directory structure for example.
+Use the enriched card: [bator/bkk-stop-card](https://github.com/bator/bkk-stop-card)  
+(`custom:bkk-stop-card-r2`).
 
-Lovelace UI:<br />
+Action for manual refresh: `bkk_stop.refresh` with `entity_id`.
+
+## Upstream
+
+Please consider supporting the original author: [amaximus/bkk_stop](https://github.com/amaximus/bkk_stop).
+
 ![bkk_stop Lovelace example](example/bkk_lovelace.jpg)
